@@ -67,14 +67,34 @@ export class ProcessingProcessor {
 
   private async processImage(imageUrl: string): Promise<string> {
     try {
-      const response = await axios.get(imageUrl, {
-        responseType: 'arraybuffer',
-      });
-      const buffer = Buffer.from(response.data);
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
 
-      const processedBuffer = await sharp(buffer)
-        .jpeg({ quality: 50 })
-        .toBuffer();
+      const buffer = Buffer.from(await response.arrayBuffer());
+      
+      // Detect image format
+      const metadata = await sharp(buffer).metadata();
+      if (!metadata.format) {
+        throw new Error('Could not detect image format');
+      }
+
+      this.logger.debug(`Processing image format: ${metadata.format}`);
+
+      // Process image based on format
+      let processedBuffer: Buffer;
+      try {
+        const sharpInstance = sharp(buffer);
+        
+        // Convert all images to JPEG with quality optimization
+        processedBuffer = await sharpInstance
+          .jpeg({ quality: 50, force: true })
+          .toBuffer();
+      } catch (error) {
+        this.logger.error(`Error processing image: ${error.message}`);
+        throw new Error(`Image processing failed: ${error.message}`);
+      }
 
       const fileName = `processed-${path.basename(imageUrl)}`;
       
