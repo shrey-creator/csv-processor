@@ -82,7 +82,7 @@ Once the application is running, you can access the Swagger documentation at:
 http://localhost:3000/api
 ```
 
-For detailed API documentation and examples, see the [Postman Collection](https://dark-robot-5027.postman.co/workspace/AY~478d692b-7185-46ab-9e1d-e4c16d4ea9d9/colle[%E2%80%A6]vironment=23050360-466fec58-28a2-4545-b889-7a1a538b61b2).
+For detailed API documentation and examples, see the [Postman Collection](https://www.postman.com/shrey003agrawl/shrey003agrawal/collection/12372130-30e06a57-3557-47b5-ba97-23ceb5fdb1ff/?action=share&creator=12372130).
 
 ## Architecture
 
