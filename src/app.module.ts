@@ -1,12 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { BullModule } from '@nestjs/bull';
-import { join } from 'path';
 import { databaseConfig } from './config/database.config';
 import { ProcessingModule } from './modules/processing/processing.module';
-import { ApideckModule } from './common/providers/apideck.module';
 
 @Module({
   imports: [
@@ -22,7 +19,6 @@ import { ApideckModule } from './common/providers/apideck.module';
       },
     }),
     ProcessingModule,
-    ApideckModule,
   ],
 })
 export class AppModule {}

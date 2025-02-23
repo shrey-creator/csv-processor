@@ -4,10 +4,10 @@ import { BullModule } from '@nestjs/bull';
 import { ProcessingService } from './services/processing.service';
 import { ProductService } from './services/product.service';
 import { ProcessingController } from './controllers/processing.controller';
-import { ProcessingProcessor } from './processors/processing.processor';
+import { CompressImageConsumer } from './consumers/compress-image.consumer';
 import { ProcessingRequest } from './entities/processing-request.entity';
 import { Product } from './entities/product.entity';
-import { ApideckModule } from '../../common/providers/apideck.module';
+import { CloudinaryProvider } from '../../common/providers/cloudinary.provider';
 import { CsvHelper } from '../../common/helpers/csv.helper';
 
 @Module({
@@ -20,10 +20,15 @@ import { CsvHelper } from '../../common/helpers/csv.helper';
         removeOnFail: false,
       },
     }),
-    ApideckModule,
   ],
   controllers: [ProcessingController],
-  providers: [ProcessingService, ProductService, ProcessingProcessor, CsvHelper],
+  providers: [
+    ProcessingService, 
+    ProductService, 
+    CompressImageConsumer,
+    CloudinaryProvider,
+    CsvHelper,
+  ],
   exports: [ProcessingService],
 })
 export class ProcessingModule {} 

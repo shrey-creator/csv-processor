@@ -7,18 +7,18 @@ import { ProcessingRequest, ProcessingStatus } from '../entities/processing-requ
 import * as sharp from 'sharp';
 import axios from 'axios';
 import * as path from 'path';
-import { ApideckProvider } from '../../../common/providers/apideck.provider';
+import { CloudinaryProvider } from '../../../common/providers/cloudinary.provider';
 import { ProductService } from '../services/product.service';
 
 @Processor('image-processing')
-export class ProcessingProcessor {
-  private readonly logger = new Logger(ProcessingProcessor.name);
+export class CompressImageConsumer {
+  private readonly logger = new Logger(CompressImageConsumer.name);
 
   constructor(
     @InjectRepository(ProcessingRequest)
     private processingRequestRepository: Repository<ProcessingRequest>,
     private productService: ProductService,
-    private apideckProvider: ApideckProvider,
+    private cloudinaryProvider: CloudinaryProvider,
   ) {}
 
   @Process('process-images')
@@ -74,32 +74,14 @@ export class ProcessingProcessor {
 
       const buffer = Buffer.from(await response.arrayBuffer());
       
-      // Detect image format
-      const metadata = await sharp(buffer).metadata();
-      if (!metadata.format) {
-        throw new Error('Could not detect image format');
-      }
+      // Process image with Sharp first
+      const processedBuffer = await sharp(buffer)
+        .jpeg({ quality: 50 })
+        .toBuffer();
 
-      this.logger.debug(`Processing image format: ${metadata.format}`);
-
-      // Process image based on format
-      let processedBuffer: Buffer;
-      try {
-        const sharpInstance = sharp(buffer);
-        
-        // Convert all images to JPEG with quality optimization
-        processedBuffer = await sharpInstance
-          .jpeg({ quality: 50, force: true })
-          .toBuffer();
-      } catch (error) {
-        this.logger.error(`Error processing image: ${error.message}`);
-        throw new Error(`Image processing failed: ${error.message}`);
-      }
-
+      // Upload to Cloudinary
       const fileName = `processed-${path.basename(imageUrl)}`;
-      
-      const fileUrl = await this.apideckProvider.uploadFile(processedBuffer, fileName);
-      return fileUrl;
+      return await this.cloudinaryProvider.uploadFile(processedBuffer, fileName);
     } catch (error) {
       this.logger.error(`Error processing image ${imageUrl}: ${error.message}`);
       throw error;
