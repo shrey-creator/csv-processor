@@ -1,30 +1,32 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Process, Processor } from '@nestjs/bull';
+import { Logger } from '@nestjs/common';
+import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  ProcessingRequest,
-  ProcessingStatus,
-} from '../../common/entities/processing-request.entity';
-import { Product } from '../../common/entities/product.entity';
+import { ProcessingRequest, ProcessingStatus } from '../entities/processing-request.entity';
 import * as sharp from 'sharp';
 import axios from 'axios';
 import * as path from 'path';
-import * as fs from 'fs/promises';
+import { ApideckProvider } from '../../../common/providers/apideck.provider';
+import { ProductService } from '../services/product.service';
 
-@Injectable()
-export class ImageProcessingService {
-  private readonly logger = new Logger(ImageProcessingService.name);
+@Processor('image-processing')
+export class ProcessingProcessor {
+  private readonly logger = new Logger(ProcessingProcessor.name);
 
   constructor(
     @InjectRepository(ProcessingRequest)
     private processingRequestRepository: Repository<ProcessingRequest>,
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    private productService: ProductService,
+    private apideckProvider: ApideckProvider,
   ) {}
 
-  async processImages(processingRequestId: string): Promise<void> {
+  @Process('process-images')
+  async processImages(job: Job<{ processingRequestId: string }>) {
+    this.logger.debug(`Processing job ${job.id} for request ${job.data.processingRequestId}`);
+    
     const processingRequest = await this.processingRequestRepository.findOne({
-      where: { id: processingRequestId },
+      where: { id: job.data.processingRequestId },
       relations: ['products'],
     });
 
@@ -33,13 +35,17 @@ export class ImageProcessingService {
     }
 
     try {
-      for (const product of processingRequest.products) {
+      const products = await this.productService.findByProcessingRequestId(processingRequest.id);
+      
+      for (const product of products) {
         const outputUrls = await Promise.all(
           product.inputImageUrls.map((url) => this.processImage(url)),
         );
 
-        product.outputImageUrls = outputUrls;
-        await this.productRepository.save(product);
+        await this.productService.updateProductOutputUrls(product.id, outputUrls);
+
+        // Update job progress
+        await job.progress((products.indexOf(product) + 1) / products.length * 100);
       }
 
       processingRequest.status = ProcessingStatus.COMPLETED;
@@ -48,11 +54,14 @@ export class ImageProcessingService {
       if (processingRequest.webhookUrl) {
         await this.notifyWebhook(processingRequest);
       }
+
+      return { success: true, requestId: processingRequest.id };
     } catch (error) {
       this.logger.error(`Error processing images: ${error.message}`);
       processingRequest.status = ProcessingStatus.FAILED;
       processingRequest.errorMessage = error.message;
       await this.processingRequestRepository.save(processingRequest);
+      throw error;
     }
   }
 
@@ -64,28 +73,20 @@ export class ImageProcessingService {
       const buffer = Buffer.from(response.data);
 
       const processedBuffer = await sharp(buffer)
-        .jpeg({ quality: 50 }) // Compress by 50%
+        .jpeg({ quality: 50 })
         .toBuffer();
 
-      // In a real application, you would upload this to a cloud storage service
-      // For this example, we'll save locally and return a mock URL
       const fileName = `processed-${path.basename(imageUrl)}`;
-      const outputPath = path.join(process.cwd(), 'uploads', fileName);
-
-      await fs.mkdir(path.join(process.cwd(), 'uploads'), { recursive: true });
-      await fs.writeFile(outputPath, processedBuffer);
-
-      // In real application, return the cloud storage URL
-      return `http://localhost:3000/uploads/${fileName}`;
+      
+      const fileUrl = await this.apideckProvider.uploadFile(processedBuffer, fileName);
+      return fileUrl;
     } catch (error) {
       this.logger.error(`Error processing image ${imageUrl}: ${error.message}`);
       throw error;
     }
   }
 
-  private async notifyWebhook(
-    processingRequest: ProcessingRequest,
-  ): Promise<void> {
+  private async notifyWebhook(processingRequest: ProcessingRequest): Promise<void> {
     try {
       await axios.post(processingRequest.webhookUrl, {
         requestId: processingRequest.id,
@@ -96,4 +97,4 @@ export class ImageProcessingService {
       this.logger.error(`Error notifying webhook: ${error.message}`);
     }
   }
-}
+} 

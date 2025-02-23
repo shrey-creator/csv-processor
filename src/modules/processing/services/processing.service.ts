@@ -1,13 +1,13 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ProcessingRequest, ProcessingStatus } from '../entities/processing-request.entity';
 import { parse } from 'csv-parse';
-import {
-  ProcessingRequest,
-  ProcessingStatus,
-} from '../../common/entities/processing-request.entity';
-import { Product } from '../../common/entities/product.entity';
 import { createReadStream } from 'fs';
+import { ApideckProvider } from '../../../common/providers/apideck.provider';
+import { ProductService } from './product.service';
 
 interface CsvProduct {
   serialNumber: string;
@@ -16,12 +16,14 @@ interface CsvProduct {
 }
 
 @Injectable()
-export class CsvService {
+export class ProcessingService {
+  private readonly logger = new Logger(ProcessingService.name);
+
   constructor(
     @InjectRepository(ProcessingRequest)
     private processingRequestRepository: Repository<ProcessingRequest>,
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    @InjectQueue('image-processing') private imageProcessingQueue: Queue,
+    private productService: ProductService,
   ) {}
 
   async processCSV(
@@ -38,10 +40,25 @@ export class CsvService {
 
     try {
       const products = await this.parseCSV(file.path);
-      await this.validateAndSaveProducts(products, processingRequest);
+      await this.productService.createProducts(products, processingRequest);
 
       processingRequest.status = ProcessingStatus.PROCESSING;
       await this.processingRequestRepository.save(processingRequest);
+
+      // Add job to queue
+      await this.imageProcessingQueue.add(
+        'process-images',
+        {
+          processingRequestId: processingRequest.id,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 1000,
+          },
+        },
+      );
 
       return processingRequest;
     } catch (error) {
@@ -77,33 +94,6 @@ export class CsvService {
     });
   }
 
-  private async validateAndSaveProducts(
-    products: CsvProduct[],
-    processingRequest: ProcessingRequest,
-  ) {
-    if (!products.length) {
-      throw new BadRequestException('CSV file is empty');
-    }
-
-    for (const product of products) {
-      if (
-        !product.serialNumber ||
-        !product.productName ||
-        !product.inputImageUrls.length
-      ) {
-        throw new BadRequestException(
-          'Invalid CSV format. Required columns: Serial Number, Product Name, Input Image Urls',
-        );
-      }
-
-      const newProduct = this.productRepository.create({
-        ...product,
-        processingRequest,
-      });
-      await this.productRepository.save(newProduct);
-    }
-  }
-
   async getProcessingStatus(requestId: string): Promise<ProcessingRequest> {
     const request = await this.processingRequestRepository.findOne({
       where: { id: requestId },
@@ -116,4 +106,25 @@ export class CsvService {
 
     return request;
   }
-}
+
+  async getJobStatus(jobId: string) {
+    const job = await this.imageProcessingQueue.getJob(jobId);
+    if (!job) {
+      throw new BadRequestException('Job not found');
+    }
+
+    const state = await job.getState();
+    const progress = await job.progress();
+
+    return {
+      id: job.id,
+      state,
+      progress,
+      data: job.data,
+      returnvalue: job.returnvalue,
+      failedReason: job.failedReason,
+      stacktrace: job.stacktrace,
+      timestamp: job.timestamp,
+    };
+  }
+} 
