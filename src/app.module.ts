@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { databaseConfig } from './config/database.config';
 import { ProcessingModule } from './modules/processing/processing.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -20,5 +21,6 @@ import { ProcessingModule } from './modules/processing/processing.module';
     }),
     ProcessingModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule {}
