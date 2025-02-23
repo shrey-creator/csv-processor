@@ -79,7 +79,7 @@ npm run start:prod
 
 Once the application is running, you can access the Swagger documentation at:
 ```
-http://localhost:3000/api/docs
+http://localhost:3000/api
 ```
 
 For detailed API documentation and examples, see the [Postman Collection](docs/postman-collection.md).
