@@ -4,16 +4,8 @@ import { Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProcessingRequest, ProcessingStatus } from '../entities/processing-request.entity';
-import { parse } from 'csv-parse';
-import { createReadStream } from 'fs';
-import { ApideckProvider } from '../../../common/providers/apideck.provider';
 import { ProductService } from './product.service';
-
-interface CsvProduct {
-  serialNumber: string;
-  productName: string;
-  inputImageUrls: string[];
-}
+import { CsvHelper } from '../../../common/helpers/csv.helper';
 
 @Injectable()
 export class ProcessingService {
@@ -24,6 +16,7 @@ export class ProcessingService {
     private processingRequestRepository: Repository<ProcessingRequest>,
     @InjectQueue('image-processing') private imageProcessingQueue: Queue,
     private productService: ProductService,
+    private csvHelper: CsvHelper,
   ) {}
 
   async processCSV(
@@ -39,7 +32,11 @@ export class ProcessingService {
     await this.processingRequestRepository.save(processingRequest);
 
     try {
-      const products = await this.parseCSV(file.path);
+      // Validate and parse CSV
+      
+      const  products = await this.csvHelper.parseCSVBuffer(file);
+     
+
       await this.productService.createProducts(products, processingRequest);
 
       processingRequest.status = ProcessingStatus.PROCESSING;
@@ -67,31 +64,6 @@ export class ProcessingService {
       await this.processingRequestRepository.save(processingRequest);
       throw error;
     }
-  }
-
-  private async parseCSV(filePath: string): Promise<CsvProduct[]> {
-    return new Promise((resolve, reject) => {
-      const products: CsvProduct[] = [];
-      createReadStream(filePath)
-        .pipe(
-          parse({
-            columns: true,
-            skip_empty_lines: true,
-          }),
-        )
-        .on('data', (row) => {
-          products.push({
-            serialNumber: row['S. No.'] || row['Serial Number'],
-            productName: row['Product Name'],
-            inputImageUrls: (row['Input Image Urls'] || '')
-              .split(',')
-              .map((url) => url.trim())
-              .filter((url) => url),
-          });
-        })
-        .on('error', reject)
-        .on('end', () => resolve(products));
-    });
   }
 
   async getProcessingStatus(requestId: string): Promise<ProcessingRequest> {
