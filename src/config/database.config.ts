@@ -12,4 +12,5 @@ export const databaseConfig: TypeOrmModuleOptions = {
   database: process.env.DB_NAME ?? 'csv_processor',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   synchronize: process.env.NODE_ENV !== 'production',
+  ssl: true
 };

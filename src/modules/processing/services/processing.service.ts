@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { ProcessingRequest, ProcessingStatus } from '../entities/processing-request.entity';
 import { ProductService } from './product.service';
 import { CsvHelper } from '../../../common/helpers/csv.helper';
+import { ProcessingStatusDto, ProcessingDetailsDto, ProductDetailsDto } from '../dto/processing.dto';
 
 @Injectable()
 export class ProcessingService {
@@ -66,7 +67,22 @@ export class ProcessingService {
     }
   }
 
-  async getProcessingStatus(requestId: string): Promise<ProcessingRequest> {
+  async getProcessingStatus(requestId: string): Promise<ProcessingStatusDto> {
+    const request = await this.processingRequestRepository.findOne({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      throw new BadRequestException('Processing request not found');
+    }
+
+    return {
+      id: request.id,
+      status: request.status,
+    };
+  }
+
+  async getProcessingDetails(requestId: string): Promise<ProcessingDetailsDto> {
     const request = await this.processingRequestRepository.findOne({
       where: { id: requestId },
       relations: ['products'],
@@ -76,7 +92,24 @@ export class ProcessingService {
       throw new BadRequestException('Processing request not found');
     }
 
-    return request;
+    const products: ProductDetailsDto[] = request.products.map(product => ({
+      id: product.id,
+      serialNumber: product.serialNumber,
+      productName: product.productName,
+      inputImageUrls: product.inputImageUrls,
+      outputImageUrls: product.outputImageUrls,
+    }));
+
+    return {
+      id: request.id,
+      originalFileName: request.originalFileName,
+      status: request.status,
+      errorMessage: request.errorMessage,
+      webhookUrl: request.webhookUrl,
+      products,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+    };
   }
 
   async getJobStatus(jobId: string) {

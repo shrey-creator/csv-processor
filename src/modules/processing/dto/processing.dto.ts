@@ -15,7 +15,6 @@ export class ProcessingRequestDto {
     required: false,
   })
   @IsOptional()
-  
   @IsString()
   webhookUrl?: string;
 }
@@ -95,4 +94,94 @@ export class JobStatusResponseDto {
     required: false,
   })
   stacktrace?: string[];
+}
+
+export class ProcessingStatusDto {
+  @ApiProperty({
+    description: 'The unique identifier of the processing request',
+  })
+  id: string;
+
+  @ApiProperty({
+    description: 'The current status of the processing request',
+    enum: ProcessingStatus,
+  })
+  status: ProcessingStatus;
+
+}
+
+export class ProductDetailsDto {
+  @ApiProperty({
+    description: 'The unique identifier of the product',
+  })
+  id: string;
+
+  @ApiProperty({
+    description: 'The serial number of the product',
+  })
+  serialNumber: string;
+
+  @ApiProperty({
+    description: 'The name of the product',
+  })
+  productName: string;
+
+  @ApiProperty({
+    description: 'Array of input image URLs',
+    type: [String],
+  })
+  inputImageUrls: string[];
+
+  @ApiProperty({
+    description: 'Array of processed image URLs',
+    type: [String],
+    required: false,
+  })
+  outputImageUrls?: string[];
+}
+
+export class ProcessingDetailsDto {
+  @ApiProperty({
+    description: 'The unique identifier of the processing request',
+  })
+  id: string;
+
+  @ApiProperty({
+    description: 'The original filename of the uploaded CSV',
+  })
+  originalFileName: string;
+
+  @ApiProperty({
+    description: 'The current status of the processing request',
+    enum: ProcessingStatus,
+  })
+  status: ProcessingStatus;
+
+  @ApiProperty({
+    description: 'Error message if processing failed',
+    required: false,
+  })
+  errorMessage?: string;
+
+  @ApiProperty({
+    description: 'Webhook URL for notifications',
+    required: false,
+  })
+  webhookUrl?: string;
+
+  @ApiProperty({
+    description: 'Array of products being processed',
+    type: [ProductDetailsDto],
+  })
+  products: ProductDetailsDto[];
+
+  @ApiProperty({
+    description: 'When the processing request was created',
+  })
+  createdAt: Date;
+
+  @ApiProperty({
+    description: 'When the processing request was last updated',
+  })
+  updatedAt: Date;
 } 

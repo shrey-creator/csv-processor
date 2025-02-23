@@ -16,6 +16,8 @@ import {
   ProcessingRequestDto,
   ProcessingResponseDto,
   JobStatusResponseDto,
+  ProcessingStatusDto,
+  ProcessingDetailsDto,
 } from '../dto/processing.dto';
 import {
   ApiTags,
@@ -63,49 +65,49 @@ export class ProcessingController {
     return this.processingService.processCSV(file, processingRequestDto.webhookUrl);
   }
 
-  @Get('status/:requestId')
+  @Get('/:processingId')
   @ApiOperation({
-    summary: 'Get processing status',
-    description: 'Get the current status of a processing request',
+    summary: 'Get detailed processing information',
+    description: 'Get complete information about a processing request including all products and their status',
   })
   @ApiParam({
-    name: 'requestId',
+    name: 'processingId',
     description: 'The ID of the processing request',
     type: 'string',
   })
   @ApiResponse({
     status: 200,
-    description: 'The current status of the processing request',
-    type: ProcessingResponseDto,
+    description: 'Detailed information about the processing request',
+    type: ProcessingDetailsDto,
   })
   @ApiResponse({
     status: 404,
     description: 'Processing request not found',
   })
-  async getStatus(@Param('requestId') requestId: string) {
-    return this.processingService.getProcessingStatus(requestId);
+  async getDetails(@Param('processingId') processingId: string) {
+    return this.processingService.getProcessingDetails(processingId);
   }
 
-  @Get('job/:jobId')
+  @Get('/:processingId/status')
   @ApiOperation({
-    summary: 'Get job status',
-    description: 'Get the current status of an image processing job',
+    summary: 'Get processing status',
+    description: 'Get only the status of a processing request (lightweight endpoint)',
   })
   @ApiParam({
-    name: 'jobId',
-    description: 'The ID of the job',
+    name: 'processingId',
+    description: 'The ID of the processing request',
     type: 'string',
   })
   @ApiResponse({
     status: 200,
-    description: 'The current status of the job',
-    type: JobStatusResponseDto,
+    description: 'Current status of the processing request',
+    type: ProcessingStatusDto,
   })
   @ApiResponse({
     status: 404,
-    description: 'Job not found',
+    description: 'Processing request not found',
   })
-  async getJobStatus(@Param('jobId') jobId: string) {
-    return this.processingService.getJobStatus(jobId);
+  async getStatus(@Param('processingId') processingId: string) {
+    return this.processingService.getProcessingStatus(processingId);
   }
 } 
